@@ -97,9 +97,17 @@ class FaceMatcherApp(QMainWindow):
         
         self.progress_bar = QProgressBar()
 
+        self.exit_button = QPushButton("Exit", self)
+        self.exit_button.clicked.connect(self.close)
+       
+
+
+
+
         layout = QGridLayout(main_widget)
         layout.addWidget(QLabel('Progress:'), 5, 0)
         layout.addWidget(self.progress_bar, 5, 1, 1, 3)
+        layout.addWidget(self.exit_button)
         
         # Create a scroll area
         scroll_area = QScrollArea()
@@ -149,9 +157,7 @@ class FaceMatcherApp(QMainWindow):
         find_match_button = QPushButton('Find match')
         find_match_button.clicked.connect(self.find_match)
         
-        # Progress label and progress bar
-        # scroll_layout.addWidget(QLabel('Progress:'))
-        # scroll_layout.addWidget(self.progress_bar)
+
         
         scroll_layout.addWidget(find_match_button)
 
