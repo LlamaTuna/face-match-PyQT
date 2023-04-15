@@ -17,13 +17,18 @@ os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = '/home/vance_octane/projects/face-ma
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget, QGridLayout, QMessageBox
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QProgressBar
 
 
-def save_faces_from_folder(folder_path, face_cascade, output_folder):
+
+def save_faces_from_folder(folder_path, face_cascade, output_folder, progress_callback=None):
     face_data = {}
     valid_extensions = ['.png', '.jpeg', '.jpg']
 
-    for image_name in tqdm(os.listdir(folder_path), desc="Processing images"):
+    image_names = os.listdir(folder_path)
+    num_images = len(image_names)
+
+    for idx, image_name in enumerate(image_names, start=1):
         file_extension = os.path.splitext(image_name)[-1].lower()
 
         if file_extension not in valid_extensions:
@@ -33,17 +38,20 @@ def save_faces_from_folder(folder_path, face_cascade, output_folder):
         img = cv2.imread(image_path)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-        
+
         if len(faces) > 0:
             img_hash = hashlib.sha256(open(image_path, 'rb').read()).hexdigest()
-            face_data[img_hash] = {'faces': [], 'original_image_name': image_name}
+            face_data[img_hash] = {"file_name": image_name, "faces": []}  # Store the original image name
             for (x, y, w, h) in faces:
                 face_img = img[y:y+h, x:x+w]
-                face_data[img_hash]['faces'].append(face_img)
+                face_data[img_hash]["faces"].append(face_img)
                 output_path = os.path.join(output_folder, f"{img_hash}_{len(face_data[img_hash]['faces'])}.png")
                 cv2.imwrite(output_path, face_img)
-    return face_data
 
+        if progress_callback:
+            progress_callback(idx / num_images * 100)
+
+    return face_data
 
 
 def find_matching_face(image_path, face_cascade, face_data, threshold=0.5):
@@ -56,17 +64,16 @@ def find_matching_face(image_path, face_cascade, face_data, threshold=0.5):
     for (x, y, w, h) in faces:
         face_img = img[y:y+h, x:x+w]
         face_img = cv2.resize(face_img, (100, 100))
-        for img_hash, stored_faces_data in face_data.items():
-            stored_faces = stored_faces_data['faces']
+        for img_hash, stored_data in face_data.items():
+            stored_faces = stored_data["faces"]  # Access the stored faces
             for i, stored_face in enumerate(stored_faces):
                 stored_face_resized = cv2.resize(stored_face, (100, 100))
                 similarity = np.mean(np.abs(face_img.astype(np.float32) - stored_face_resized.astype(np.float32))) / 255.0
 
                 if similarity < threshold:
-                    matching_faces.append((img_hash, stored_face, similarity, f"{img_hash}_{i+1}.png", stored_faces_data['original_image_name']))
+                    matching_faces.append((img_hash, stored_data["file_name"], stored_face, similarity, f"{img_hash}_{i+1}.png"))  # Add the original image name
 
     return matching_faces
-
 
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -87,9 +94,13 @@ class FaceMatcherApp(QMainWindow):
 
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
+        
+        self.progress_bar = QProgressBar()
 
         layout = QGridLayout(main_widget)
-
+        layout.addWidget(QLabel('Progress:'), 5, 0)
+        layout.addWidget(self.progress_bar, 5, 1, 1, 3)
+        
         # Create a scroll area
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -137,6 +148,11 @@ class FaceMatcherApp(QMainWindow):
         # Find match button
         find_match_button = QPushButton('Find match')
         find_match_button.clicked.connect(self.find_match)
+        
+        # Progress label and progress bar
+        # scroll_layout.addWidget(QLabel('Progress:'))
+        # scroll_layout.addWidget(self.progress_bar)
+        
         scroll_layout.addWidget(find_match_button)
 
         # Result label
@@ -145,6 +161,8 @@ class FaceMatcherApp(QMainWindow):
         self.result_label.setFrameShape(QFrame.Box)  # Add a frame to the result label
         self.result_label.setFrameShadow(QFrame.Sunken)
         scroll_layout.addWidget(self.result_label)
+
+        layout.setContentsMargins(10, 10, 10, 10)
 
 
     def browse_input_folder(self):
@@ -197,7 +215,7 @@ class FaceMatcherApp(QMainWindow):
             QMessageBox.critical(self, "Error", "Please select all required folders and files.")
             return
 
-        face_data = save_faces_from_folder(input_folder, face_cascade, output_folder)
+        face_data = save_faces_from_folder(input_folder, face_cascade, output_folder, progress_callback=self.update_progress_bar)
         matching_faces = find_matching_face(image_to_search, face_cascade, face_data)
 
         if len(matching_faces) > 0:
@@ -205,8 +223,9 @@ class FaceMatcherApp(QMainWindow):
             input_image_hash = hashlib.sha256(open(image_to_search, 'rb').read()).hexdigest()
 
             result_text = f"Match(es) found:\nInput image hash: {input_image_hash}\nInput image file: {os.path.basename(image_to_search)}\n"
-            for i, (img_hash, matched_face, similarity, resized_image_name, original_image_name) in enumerate(matching_faces):
+            for i, (img_hash, original_image_name, matched_face, similarity, resized_image_name) in enumerate(matching_faces):
                 result_text += f"\nMatch {i + 1}:\nOriginal image hash: {img_hash}\nOriginal image file: {original_image_name}\nResized image file: {resized_image_name}"
+
                 if i == 0:
                     self.display_matched_face(matched_face)
 
@@ -214,6 +233,10 @@ class FaceMatcherApp(QMainWindow):
         else:
             self.result_label.setText("No match found.")
         print("Finished find_match")
+
+
+    def update_progress_bar(self, progress):
+        self.progress_bar.setValue(int(progress))
 
 
 if __name__ == '__main__':
