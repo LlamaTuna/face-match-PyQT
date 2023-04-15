@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QLabel, QLin
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QProgressBar
+from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
 
 
 
@@ -71,7 +72,8 @@ def find_matching_face(image_path, face_cascade, face_data, threshold=0.5):
                 similarity = np.mean(np.abs(face_img.astype(np.float32) - stored_face_resized.astype(np.float32))) / 255.0
 
                 if similarity < threshold:
-                    matching_faces.append((img_hash, stored_data["file_name"], stored_face, similarity, f"{img_hash}_{i+1}.png"))  # Add the original image name
+                    matching_faces.append((img_hash, stored_data["file_name"], stored_face, similarity, f"{img_hash}_{i+1}.png"))  # Add the resized image name
+
 
     return matching_faces
 
@@ -99,11 +101,6 @@ class FaceMatcherApp(QMainWindow):
 
         self.exit_button = QPushButton("Exit", self)
         self.exit_button.clicked.connect(self.close)
-       
-
-
-
-
         layout = QGridLayout(main_widget)
         layout.addWidget(QLabel('Progress:'), 5, 0)
         layout.addWidget(self.progress_bar, 5, 1, 1, 3)
@@ -162,11 +159,16 @@ class FaceMatcherApp(QMainWindow):
         scroll_layout.addWidget(find_match_button)
 
         # Result label
-        self.result_label = QLabel()
-        self.result_label.setWordWrap(True)  # Enable word wrap for better readability
-        self.result_label.setFrameShape(QFrame.Box)  # Add a frame to the result label
-        self.result_label.setFrameShadow(QFrame.Sunken)
-        scroll_layout.addWidget(self.result_label)
+        self.result_table = QTableWidget(self)
+        layout.addWidget(self.result_table, 7, 0, 1, 3)
+
+
+
+        # self.result_label = QLabel()
+        # self.result_label.setWordWrap(True)  # Enable word wrap for better readability
+        # self.result_label.setFrameShape(QFrame.Box)  # Add a frame to the result label
+        # self.result_label.setFrameShadow(QFrame.Sunken)
+        # scroll_layout.addWidget(self.result_label)
 
         layout.setContentsMargins(10, 10, 10, 10)
 
@@ -225,22 +227,28 @@ class FaceMatcherApp(QMainWindow):
         matching_faces = find_matching_face(image_to_search, face_cascade, face_data)
 
         if len(matching_faces) > 0:
-            # Get the hash of the input image
-            input_image_hash = hashlib.sha256(open(image_to_search, 'rb').read()).hexdigest()
+            self.result_table.setColumnCount(5)
+            self.result_table.setHorizontalHeaderLabels(['Match', 'Original Image Hash', 'Resized Image File', 'Original Image File', 'Similarity'])
+            self.result_table.setRowCount(len(matching_faces))
 
-            result_text = f"Match(es) found:\nInput image hash: {input_image_hash}\nInput image file: {os.path.basename(image_to_search)}\n"
             for i, (img_hash, original_image_name, matched_face, similarity, resized_image_name) in enumerate(matching_faces):
-                result_text += f"\nMatch {i + 1}:\nOriginal image hash: {img_hash}\nOriginal image file: {original_image_name}\nResized image file: {resized_image_name}\nSimilarity score: {similarity:.2f}"
+
+                self.result_table.setItem(i, 0, QTableWidgetItem(f"Match {i + 1}"))
+                self.result_table.setItem(i, 1, QTableWidgetItem(img_hash))
+                self.result_table.setItem(i, 2, QTableWidgetItem(resized_image_name))
+                self.result_table.setItem(i, 3, QTableWidgetItem(original_image_name))
+                self.result_table.setItem(i, 4, QTableWidgetItem(f"{similarity.item(0) * 100:.2f}%"))
+
 
                 if i == 0:
                     self.display_matched_face(matched_face)
 
-            self.result_label.setText(result_text)
+            self.result_table.resizeColumnsToContents()
         else:
-            self.result_label.setText("No match found.")
+            self.result_table.setRowCount(0)
+            self.result_table.setColumnCount(0)
+
         print("Finished find_match")
-
-
 
     def update_progress_bar(self, progress):
         self.progress_bar.setValue(int(progress))
