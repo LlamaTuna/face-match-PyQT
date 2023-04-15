@@ -36,13 +36,14 @@ def save_faces_from_folder(folder_path, face_cascade, output_folder):
         
         if len(faces) > 0:
             img_hash = hashlib.sha256(open(image_path, 'rb').read()).hexdigest()
-            face_data[img_hash] = []
+            face_data[img_hash] = {'faces': [], 'original_image_name': image_name}
             for (x, y, w, h) in faces:
                 face_img = img[y:y+h, x:x+w]
-                face_data[img_hash].append(face_img)
-                output_path = os.path.join(output_folder, f"{img_hash}_{len(face_data[img_hash])}.png")
+                face_data[img_hash]['faces'].append(face_img)
+                output_path = os.path.join(output_folder, f"{img_hash}_{len(face_data[img_hash]['faces'])}.png")
                 cv2.imwrite(output_path, face_img)
     return face_data
+
 
 
 def find_matching_face(image_path, face_cascade, face_data, threshold=0.5):
@@ -50,35 +51,31 @@ def find_matching_face(image_path, face_cascade, face_data, threshold=0.5):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-    best_similarity = float('inf')
-    best_img_hash = None
-    best_stored_face = None
-    best_original_image_name = None
+    matching_faces = []
 
     for (x, y, w, h) in faces:
         face_img = img[y:y+h, x:x+w]
         face_img = cv2.resize(face_img, (100, 100))
-        for img_hash, stored_faces in face_data.items():
+        for img_hash, stored_faces_data in face_data.items():
+            stored_faces = stored_faces_data['faces']
             for i, stored_face in enumerate(stored_faces):
                 stored_face_resized = cv2.resize(stored_face, (100, 100))
                 similarity = np.mean(np.abs(face_img.astype(np.float32) - stored_face_resized.astype(np.float32))) / 255.0
 
-                if similarity < best_similarity:
-                    best_similarity = similarity
-                    best_img_hash = img_hash
-                    best_stored_face = stored_face
-                    best_original_image_name = f"{img_hash}_{i+1}.png"
+                if similarity < threshold:
+                    matching_faces.append((img_hash, stored_face, similarity, f"{img_hash}_{i+1}.png", stored_faces_data['original_image_name']))
 
-    if best_similarity < threshold:
-        return best_img_hash, best_stored_face, best_similarity, best_original_image_name
+    return matching_faces
 
-    return None, None, None, None
+
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 input_folder = "./faceTests/"
 output_folder = "./output/"
     
 # GUI code
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget, QGridLayout, QMessageBox, QScrollArea, QFrame
+
 class FaceMatcherApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -93,46 +90,62 @@ class FaceMatcherApp(QMainWindow):
 
         layout = QGridLayout(main_widget)
 
+        # Create a scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        layout.addWidget(scroll_area, 0, 0, 1, 4)
+
+        # Create a container widget for the scroll area
+        scroll_container = QWidget()
+        scroll_area.setWidget(scroll_container)
+
+        # Create a layout for the container widget
+        scroll_layout = QVBoxLayout(scroll_container)
+
         # Input folder
         self.input_folder_edit = QLineEdit()
         input_folder_button = QPushButton('Browse')
         input_folder_button.clicked.connect(self.browse_input_folder)
-        layout.addWidget(QLabel('Input folder:'), 0, 0)
-        layout.addWidget(self.input_folder_edit, 0, 1)
-        layout.addWidget(input_folder_button, 0, 2)
+        scroll_layout.addWidget(QLabel('Input folder:'))
+        scroll_layout.addWidget(self.input_folder_edit)
+        scroll_layout.addWidget(input_folder_button)
 
         # Output folder
         self.output_folder_edit = QLineEdit()
         output_folder_button = QPushButton('Browse')
         output_folder_button.clicked.connect(self.browse_output_folder)
-        layout.addWidget(QLabel('Output folder:'), 1, 0)
-        layout.addWidget(self.output_folder_edit, 1, 1)
-        layout.addWidget(output_folder_button, 1, 2)
+        scroll_layout.addWidget(QLabel('Output folder:'))
+        scroll_layout.addWidget(self.output_folder_edit)
+        scroll_layout.addWidget(output_folder_button)
 
         # Image to search
         self.image_to_search_edit = QLineEdit()
         image_to_search_button = QPushButton('Browse')
         image_to_search_button.clicked.connect(self.browse_image_to_search)
-        layout.addWidget(QLabel('Image to search:'), 2, 0)
-        layout.addWidget(self.image_to_search_edit, 2, 1)
-        layout.addWidget(image_to_search_button, 2, 2)
+        scroll_layout.addWidget(QLabel('Image to search for:'))
+        scroll_layout.addWidget(self.image_to_search_edit)
+        scroll_layout.addWidget(image_to_search_button)
 
         # Image preview
         self.image_preview_label = QLabel()
-        layout.addWidget(self.image_preview_label, 2, 3)
+        scroll_layout.addWidget(self.image_preview_label)
 
         # Matched face thumbnail
         self.matched_face_label = QLabel()
-        layout.addWidget(self.matched_face_label, 3, 3)
+        scroll_layout.addWidget(self.matched_face_label)
 
         # Find match button
         find_match_button = QPushButton('Find match')
         find_match_button.clicked.connect(self.find_match)
-        layout.addWidget(find_match_button, 3, 0, 1, 3)
+        scroll_layout.addWidget(find_match_button)
 
         # Result label
         self.result_label = QLabel()
-        layout.addWidget(self.result_label, 4, 0, 1, 3)
+        self.result_label.setWordWrap(True)  # Enable word wrap for better readability
+        self.result_label.setFrameShape(QFrame.Box)  # Add a frame to the result label
+        self.result_label.setFrameShadow(QFrame.Sunken)
+        scroll_layout.addWidget(self.result_label)
+
 
     def browse_input_folder(self):
         print("Browsing input folder")
@@ -185,15 +198,19 @@ class FaceMatcherApp(QMainWindow):
             return
 
         face_data = save_faces_from_folder(input_folder, face_cascade, output_folder)
-        img_hash, matched_face, similarity, original_image_name = find_matching_face(image_to_search, face_cascade, face_data)
+        matching_faces = find_matching_face(image_to_search, face_cascade, face_data)
 
-        if matched_face is not None:
+        if len(matching_faces) > 0:
             # Get the hash of the input image
             input_image_hash = hashlib.sha256(open(image_to_search, 'rb').read()).hexdigest()
-            
-            # Display the input image hash, matched image hash, and the original filename of the matched image
-            self.result_label.setText(f"Match found.\nInput image hash: {input_image_hash}\nInput image file: {os.path.basename(image_to_search)}\nOriginal image hash: {img_hash}\nOriginal image file: {original_image_name}")
-            self.display_matched_face(matched_face)
+
+            result_text = f"Match(es) found:\nInput image hash: {input_image_hash}\nInput image file: {os.path.basename(image_to_search)}\n"
+            for i, (img_hash, matched_face, similarity, resized_image_name, original_image_name) in enumerate(matching_faces):
+                result_text += f"\nMatch {i + 1}:\nOriginal image hash: {img_hash}\nOriginal image file: {original_image_name}\nResized image file: {resized_image_name}"
+                if i == 0:
+                    self.display_matched_face(matched_face)
+
+            self.result_label.setText(result_text)
         else:
             self.result_label.setText("No match found.")
         print("Finished find_match")
