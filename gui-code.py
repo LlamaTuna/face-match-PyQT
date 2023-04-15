@@ -230,7 +230,7 @@ class FaceMatcherApp(QMainWindow):
 
             result_text = f"Match(es) found:\nInput image hash: {input_image_hash}\nInput image file: {os.path.basename(image_to_search)}\n"
             for i, (img_hash, original_image_name, matched_face, similarity, resized_image_name) in enumerate(matching_faces):
-                result_text += f"\nMatch {i + 1}:\nOriginal image hash: {img_hash}\nOriginal image file: {original_image_name}\nResized image file: {resized_image_name}"
+                result_text += f"\nMatch {i + 1}:\nOriginal image hash: {img_hash}\nOriginal image file: {original_image_name}\nResized image file: {resized_image_name}\nSimilarity score: {similarity:.2f}"
 
                 if i == 0:
                     self.display_matched_face(matched_face)
@@ -239,6 +239,7 @@ class FaceMatcherApp(QMainWindow):
         else:
             self.result_label.setText("No match found.")
         print("Finished find_match")
+
 
 
     def update_progress_bar(self, progress):
