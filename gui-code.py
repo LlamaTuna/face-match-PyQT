@@ -14,7 +14,8 @@ if pyqt5_path in sys.path:
 sys.path.append('/usr/lib/python3/dist-packages')
 os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = '/home/vance_octane/projects/face-match_Pyqt/face-match-venv/lib/python3.9/site-packages'
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget, QGridLayout, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget, QGridLayout, QMessageBox, QScrollArea, QFrame,QTableWidgetItem
+
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QProgressBar
@@ -83,8 +84,14 @@ input_folder = "./faceTests/"
 output_folder = "./output/"
     
 # GUI code
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget, QGridLayout, QMessageBox, QScrollArea, QFrame
 
+class NumericTableWidgetItem(QTableWidgetItem):
+    def __init__(self, value):
+        super().__init__(str(value))
+
+    def __lt__(self, other):
+        return float(self.text()) < float(other.text())
+    
 class FaceMatcherApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -160,6 +167,8 @@ class FaceMatcherApp(QMainWindow):
 
         # Result label
         self.result_table = QTableWidget(self)
+        self.result_table.setSortingEnabled(True)
+
         layout.addWidget(self.result_table, 7, 0, 1, 3)
 
 
@@ -175,25 +184,26 @@ class FaceMatcherApp(QMainWindow):
 
     def browse_input_folder(self):
         print("Browsing input folder")
-        input_folder = QFileDialog.getExistingDirectory(self, 'Select Input Folder')
+        input_folder = QFileDialog.getExistingDirectory(self, 'Select Input Folder', options=QFileDialog.DontUseNativeDialog)
         if input_folder:
             self.input_folder_edit.setText(input_folder)
         print("Finished browsing input folder")
 
     def browse_output_folder(self):
         print("Browsing output folder")
-        output_folder = QFileDialog.getExistingDirectory(self, 'Select Output Folder')
+        output_folder = QFileDialog.getExistingDirectory(self, 'Select Output Folder', options=QFileDialog.DontUseNativeDialog)
         if output_folder:
             self.output_folder_edit.setText(output_folder)
         print("Finished browsing output folder")
 
     def browse_image_to_search(self):
         print("Browsing image to search")
-        file_path, _ = QFileDialog.getOpenFileName(self, 'Select Image to Search', '', 'Image files (*.png *.jpeg *.jpg *.bmp *.tiff)')
+        file_path, _ = QFileDialog.getOpenFileName(self, 'Select Image to Search', '', 'Image files (*.png *.jpeg *.jpg *.bmp *.tiff)', options=QFileDialog.DontUseNativeDialog)
         if file_path:
             self.image_to_search_edit.setText(file_path)
             self.load_image_thumbnail(file_path)
         print("Finished browsing image to search")
+
 
     def load_image_thumbnail(self, file_path):
         print("Loading image thumbnail")
@@ -228,16 +238,16 @@ class FaceMatcherApp(QMainWindow):
 
         if len(matching_faces) > 0:
             self.result_table.setColumnCount(5)
-            self.result_table.setHorizontalHeaderLabels(['Match', 'Original Image Hash', 'Resized Image File', 'Original Image File', 'Similarity'])
+            self.result_table.setHorizontalHeaderLabels(['Match', 'Similarity', 'Original Image File', 'Original Image Hash', 'Resized Image File'])
             self.result_table.setRowCount(len(matching_faces))
 
             for i, (img_hash, original_image_name, matched_face, similarity, resized_image_name) in enumerate(matching_faces):
 
                 self.result_table.setItem(i, 0, QTableWidgetItem(f"Match {i + 1}"))
-                self.result_table.setItem(i, 1, QTableWidgetItem(img_hash))
-                self.result_table.setItem(i, 2, QTableWidgetItem(resized_image_name))
-                self.result_table.setItem(i, 3, QTableWidgetItem(original_image_name))
-                self.result_table.setItem(i, 4, QTableWidgetItem(f"{similarity.item(0) * 100:.2f}%"))
+                self.result_table.setItem(i, 1, NumericTableWidgetItem(similarity.item(0) * 100))
+                self.result_table.setItem(i, 2, QTableWidgetItem(original_image_name))
+                self.result_table.setItem(i, 3, QTableWidgetItem(img_hash))
+                self.result_table.setItem(i, 4, QTableWidgetItem(resized_image_name))
 
 
                 if i == 0:
