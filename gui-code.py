@@ -6,22 +6,17 @@ from pathlib import Path
 from tqdm import tqdm
 from PIL import Image, ImageTk
 import cv2
-
+from PyQt5.QtWidgets import QAction
 pyqt5_path = '/home/vance_octane/projects/face-match_Pyqt/face-match-venv/lib/python3.9/site-packages/PyQt5'
 if pyqt5_path in sys.path:
     sys.path.remove(pyqt5_path)
-
 sys.path.append('/usr/lib/python3/dist-packages')
 os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = '/home/vance_octane/projects/face-match_Pyqt/face-match-venv/lib/python3.9/site-packages'
-
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget, QGridLayout, QMessageBox, QScrollArea, QFrame,QTableWidgetItem
-
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QProgressBar
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
-
-
 
 def save_faces_from_folder(folder_path, face_cascade, output_folder, progress_callback=None):
     face_data = {}
@@ -74,44 +69,80 @@ def find_matching_face(image_path, face_cascade, face_data, threshold=0.5):
 
                 if similarity < threshold:
                     matching_faces.append((img_hash, stored_data["file_name"], stored_face, similarity, f"{img_hash}_{i+1}.png"))  # Add the resized image name
-
-
     return matching_faces
-
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 input_folder = "./faceTests/"
 output_folder = "./output/"
     
 # GUI code
-
 class NumericTableWidgetItem(QTableWidgetItem):
     def __init__(self, value):
         super().__init__(str(value))
 
     def __lt__(self, other):
-        return float(self.text()) < float(other.text())
+        my_number = float(self.text().rstrip('%'))
+        other_number = float(other.text().rstrip('%'))
+        return my_number < other_number
+  
+class MatchTableWidgetItem(QTableWidgetItem):
+    def __lt__(self, other):
+        my_number = int(self.text().split()[-1])
+        other_number = int(other.text().split()[-1])
+        return my_number < other_number
     
 class FaceMatcherApp(QMainWindow):
     def __init__(self):
         super().__init__()
-
+        self.dark_theme_enabled = False
         self.initUI()
+
+    def create_menu_bar(self):
+        menubar = self.menuBar()
+
+        # Create File menu
+        file_menu = menubar.addMenu('File')
+
+        # Create Exit action
+        exit_action = QAction('Exit', self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
+        # Create View menu
+        view_menu = menubar.addMenu('View')
+
+        # Create Toggle Dark Theme action
+        toggle_dark_theme_action = QAction('Toggle Dark Theme', self)
+        toggle_dark_theme_action.triggered.connect(self.toggle_dark_theme)
+        view_menu.addAction(toggle_dark_theme_action)
+    
+    def toggle_dark_theme(self):
+        if self.dark_theme_enabled:
+            self.dark_theme_enabled = False
+            self.setStyleSheet("")
+        else:
+            self.dark_theme_enabled = True
+            current_directory = os.path.dirname(os.path.abspath(__file__))
+            dark_theme_path = os.path.join(current_directory, "styles", "dark_theme.qss")
+            self.setStyleSheet(load_stylesheet(dark_theme_path))
 
     def initUI(self):
         self.setWindowTitle('Face Matcher')
+        self.create_menu_bar()
 
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         
         self.progress_bar = QProgressBar()
 
-        self.exit_button = QPushButton("Exit", self)
-        self.exit_button.clicked.connect(self.close)
+        # self.exit_button = QPushButton("Exit", self)
+        # self.exit_button.setFixedSize(50, 20)  # Set the size of the exit button
+        # self.exit_button.clicked.connect(self.close)
         layout = QGridLayout(main_widget)
         layout.addWidget(QLabel('Progress:'), 5, 0)
-        layout.addWidget(self.progress_bar, 5, 1, 1, 3)
-        layout.addWidget(self.exit_button)
+        layout.addWidget(self.progress_bar, 5, 1, 1, 2)  # Update the column span from 3 to 2
+        # layout.addWidget(self.exit_button, 5, 3, alignment=Qt.AlignRight)  # Set the alignment to AlignRight
+
         
         # Create a scroll area
         scroll_area = QScrollArea()
@@ -160,9 +191,7 @@ class FaceMatcherApp(QMainWindow):
         # Find match button
         find_match_button = QPushButton('Find match')
         find_match_button.clicked.connect(self.find_match)
-        
-
-        
+     
         scroll_layout.addWidget(find_match_button)
 
         # Result label
@@ -171,16 +200,7 @@ class FaceMatcherApp(QMainWindow):
 
         layout.addWidget(self.result_table, 7, 0, 1, 3)
 
-
-
-        # self.result_label = QLabel()
-        # self.result_label.setWordWrap(True)  # Enable word wrap for better readability
-        # self.result_label.setFrameShape(QFrame.Box)  # Add a frame to the result label
-        # self.result_label.setFrameShadow(QFrame.Sunken)
-        # scroll_layout.addWidget(self.result_label)
-
         layout.setContentsMargins(10, 10, 10, 10)
-
 
     def browse_input_folder(self):
         print("Browsing input folder")
@@ -242,13 +262,11 @@ class FaceMatcherApp(QMainWindow):
             self.result_table.setRowCount(len(matching_faces))
 
             for i, (img_hash, original_image_name, matched_face, similarity, resized_image_name) in enumerate(matching_faces):
-
-                self.result_table.setItem(i, 0, QTableWidgetItem(f"Match {i + 1}"))
-                self.result_table.setItem(i, 1, NumericTableWidgetItem(similarity.item(0) * 100))
+                self.result_table.setItem(i, 0, MatchTableWidgetItem(f"Match {i + 1}"))
+                self.result_table.setItem(i, 1, NumericTableWidgetItem(f"{similarity * 100:.2f}%"))
                 self.result_table.setItem(i, 2, QTableWidgetItem(original_image_name))
                 self.result_table.setItem(i, 3, QTableWidgetItem(img_hash))
                 self.result_table.setItem(i, 4, QTableWidgetItem(resized_image_name))
-
 
                 if i == 0:
                     self.display_matched_face(matched_face)
@@ -262,7 +280,15 @@ class FaceMatcherApp(QMainWindow):
 
     def update_progress_bar(self, progress):
         self.progress_bar.setValue(int(progress))
+    
+def load_stylesheet(file_path):
+    with open(file_path, "r") as file:
+        return file.read()
 
+
+current_directory = os.path.dirname(os.path.abspath(__file__))
+dark_theme_path = os.path.join(current_directory, "styles", "dark_theme.qss")
+print(dark_theme_path)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
