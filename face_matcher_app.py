@@ -22,6 +22,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QProgressBar
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
 from face_matcher_app_class import FaceMatcherApp
+from PyQt5.QtWidgets import QHBoxLayout, QStyle
+
 
 
 

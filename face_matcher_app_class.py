@@ -6,6 +6,8 @@ from PyQt5.QtCore import Qt
 from face_detection import save_faces_from_folder, find_matching_face
 from gui_elements import NumericTableWidgetItem, MatchTableWidgetItem
 from PyQt5.QtWidgets import QAction
+from PyQt5.QtWidgets import QStyle
+from PyQt5.QtWidgets import QHBoxLayout
 
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -36,6 +38,38 @@ class FaceMatcherApp(QMainWindow):
         toggle_dark_theme_action = QAction('Toggle Dark Theme', self)
         toggle_dark_theme_action.triggered.connect(self.toggle_dark_theme)
         view_menu.addAction(toggle_dark_theme_action)
+
+    def get_matched_face_by_row(self, row):
+        if row >= 0 and row < self.result_table.rowCount():
+            resized_image_name = self.result_table.item(row, 4).text()
+            matched_face_path = os.path.join(self.output_folder_edit.text(), resized_image_name)
+            matched_face = cv2.imread(matched_face_path)
+            return matched_face
+        return None
+
+    def previous_matched_face(self):
+        current_row = self.result_table.currentRow()
+        if current_row > 0:
+            self.result_table.selectRow(current_row - 1)
+            matched_face = self.get_matched_face_by_row(current_row - 1)
+            if matched_face is not None:
+                similarity = float(self.result_table.item(current_row - 1, 1).text().rstrip('%')) / 100
+                original_image_name = self.result_table.item(current_row - 1, 2).text()
+                self.display_matched_face(matched_face, similarity, original_image_name)
+
+    def next_matched_face(self):
+        current_row = self.result_table.currentRow()
+        if current_row < self.result_table.rowCount() - 1:
+            self.result_table.selectRow(current_row + 1)
+            matched_face = self.get_matched_face_by_row(current_row + 1)
+            if matched_face is not None:
+                similarity = float(self.result_table.item(current_row + 1, 1).text().rstrip('%')) / 100
+                original_image_name = self.result_table.item(current_row + 1, 2).text()
+                self.display_matched_face(matched_face, similarity, original_image_name)
+
+
+    def on_result_table_selection_changed(self):
+        self.display_selected_matched_face()
     
     def toggle_dark_theme(self):
         if self.dark_theme_enabled:
@@ -99,9 +133,9 @@ class FaceMatcherApp(QMainWindow):
         self.image_preview_label = QLabel()
         scroll_layout.addWidget(self.image_preview_label)
 
-        # Matched face thumbnail
-        self.matched_face_label = QLabel()
-        scroll_layout.addWidget(self.matched_face_label)
+        # # Matched face thumbnail
+        # self.matched_face_label = QLabel()
+        # scroll_layout.addWidget(self.matched_face_label)
 
         # Find match button
         find_match_button = QPushButton('Find match')
@@ -111,7 +145,35 @@ class FaceMatcherApp(QMainWindow):
 
         # Result label
         self.result_table = QTableWidget(self)
+        self.result_table.itemSelectionChanged.connect(self.on_result_table_selection_changed)
         self.result_table.setSortingEnabled(True)
+        layout.addWidget(self.result_table, 7, 0, 1, 3)
+        layout.setColumnStretch(0, 0)
+        layout.setColumnStretch(1, 0)
+        layout.setColumnStretch(2, 1)
+
+
+        # Matched face thumbnail
+        self.matched_face_label = QLabel()
+        scroll_layout.addWidget(self.matched_face_label)
+
+        # Add arrow buttons and similarity/original image name label
+        self.left_arrow_button = QPushButton()
+        self.left_arrow_button.setIcon(self.style().standardIcon(QStyle.SP_ArrowLeft))
+        self.left_arrow_button.clicked.connect(self.previous_matched_face)
+
+        self.right_arrow_button = QPushButton()
+        self.right_arrow_button.setIcon(self.style().standardIcon(QStyle.SP_ArrowRight))
+        self.right_arrow_button.clicked.connect(self.next_matched_face)
+
+        arrows_layout = QHBoxLayout()
+        arrows_layout.addWidget(self.left_arrow_button)
+        arrows_layout.addWidget(self.right_arrow_button)
+        scroll_layout.addLayout(arrows_layout)
+
+        self.similarity_original_image_label = QLabel()
+        scroll_layout.addWidget(self.similarity_original_image_label)
+
 
         layout.addWidget(self.result_table, 7, 0, 1, 3)
 
@@ -147,7 +209,7 @@ class FaceMatcherApp(QMainWindow):
         self.image_preview_label.setPixmap(scaled_pixmap)
         print("Finished loading image thumbnail")
         
-    def display_matched_face(self, matched_face):
+    def display_matched_face(self, matched_face, similarity, original_image_name):
         print("Displaying matched face")
         height, width, _ = matched_face.shape
         bytes_per_line = width * 3
@@ -155,6 +217,7 @@ class FaceMatcherApp(QMainWindow):
         pixmap = QPixmap.fromImage(q_image)
         scaled_pixmap = pixmap.scaled(100, 100, aspectRatioMode=Qt.KeepAspectRatio)
         self.matched_face_label.setPixmap(scaled_pixmap)
+        self.similarity_original_image_label.setText(f"Similarity: {similarity * 100:.2f}% | Original Image: {original_image_name}")
         print("Finished displaying matched face")
 
     def find_match(self):
@@ -183,17 +246,37 @@ class FaceMatcherApp(QMainWindow):
                 self.result_table.setItem(i, 4, QTableWidgetItem(resized_image_name))
 
                 if i == 0:
-                    self.display_matched_face(matched_face)
+                    self.display_matched_face(matched_face, similarity, original_image_name)
 
             self.result_table.resizeColumnsToContents()
         else:
             self.result_table.setRowCount(0)
             self.result_table.setColumnCount(0)
 
+    def display_selected_matched_face(self):
+        current_row = self.result_table.currentRow()
+        if current_row >= 0:
+            img_hash = self.result_table.item(current_row, 3).text()
+            resized_image_name = self.result_table.item(current_row, 4).text()
+            similarity = float(self.result_table.item(current_row, 1).text().rstrip('%')) / 100
+            original_image_name = self.result_table.item(current_row, 2).text()
+
+            matched_face_path = os.path.join(output_folder, resized_image_name)
+            matched_face = cv2.imread(matched_face_path)
+
+            if matched_face is not None:
+                self.display_matched_face(matched_face, similarity, original_image_name)
+            else:
+                print(f"Error: Could not load matched face image at '{matched_face_path}'")
+
         print("Finished find_match")
 
     def update_progress_bar(self, progress):
         self.progress_bar.setValue(int(progress))
+
+    def on_result_table_selection_changed(self):
+        self.display_selected_matched_face()
+
     
 def load_stylesheet(file_path):
     with open(file_path, "r") as file:
