@@ -8,9 +8,9 @@ from gui_elements import NumericTableWidgetItem, MatchTableWidgetItem
 from PyQt5.QtWidgets import QAction
 from PyQt5.QtWidgets import QStyle
 from PyQt5.QtWidgets import QHBoxLayout
+from face_detection import save_faces_from_folder, find_matching_face
 
 
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 input_folder = "./faceTests/"
 output_folder = "./output/"
 
@@ -147,7 +147,6 @@ class FaceMatcherApp(QMainWindow):
         self.result_table = QTableWidget(self)
         self.result_table.itemSelectionChanged.connect(self.on_result_table_selection_changed)
         self.result_table.setSortingEnabled(True)
-        layout.addWidget(self.result_table, 7, 0, 1, 3)
         layout.setColumnStretch(0, 0)
         layout.setColumnStretch(1, 0)
         layout.setColumnStretch(2, 1)
@@ -230,8 +229,13 @@ class FaceMatcherApp(QMainWindow):
             QMessageBox.critical(self, "Error", "Please select all required folders and files.")
             return
 
-        face_data = save_faces_from_folder(input_folder, face_cascade, output_folder, progress_callback=self.update_progress_bar)
-        matching_faces = find_matching_face(image_to_search, face_cascade, face_data)
+        face_data = save_faces_from_folder(folder_path=input_folder, output_folder=output_folder, progress_callback=self.update_progress_bar)
+
+
+
+
+        matching_faces = find_matching_face(image_to_search, face_data)
+
 
         if len(matching_faces) > 0:
             self.result_table.setColumnCount(5)
@@ -261,7 +265,7 @@ class FaceMatcherApp(QMainWindow):
             similarity = float(self.result_table.item(current_row, 1).text().rstrip('%')) / 100
             original_image_name = self.result_table.item(current_row, 2).text()
 
-            matched_face_path = os.path.join(output_folder, resized_image_name)
+            matched_face_path = os.path.join(self.output_folder_edit.text(), resized_image_name)
             matched_face = cv2.imread(matched_face_path)
 
             if matched_face is not None:
