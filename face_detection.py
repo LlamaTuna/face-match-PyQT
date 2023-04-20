@@ -2,6 +2,7 @@ import os
 import cv2
 import hashlib
 import numpy as np
+import face_recognition
 
 input_folder = "./faceTests/"
 output_folder = "./output/"
@@ -21,14 +22,13 @@ def save_faces_from_folder(folder_path, face_cascade, output_folder, progress_ca
 
         image_path = os.path.join(folder_path, image_name)
         img = cv2.imread(image_path)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        faces = face_recognition.face_locations(img)
 
         if len(faces) > 0:
             img_hash = hashlib.sha256(open(image_path, 'rb').read()).hexdigest()
             face_data[img_hash] = {"file_name": image_name, "faces": []}  # Store the original image name
-            for (x, y, w, h) in faces:
-                face_img = img[y:y+h, x:x+w]
+            for (top, right, bottom, left) in faces:
+                face_img = img[top:bottom, left:right]
                 face_data[img_hash]["faces"].append(face_img)
                 output_path = os.path.join(output_folder, f"{img_hash}_{len(face_data[img_hash]['faces'])}.png")
                 cv2.imwrite(output_path, face_img)
@@ -38,15 +38,15 @@ def save_faces_from_folder(folder_path, face_cascade, output_folder, progress_ca
 
     return face_data
 
-def find_matching_face(image_path, face_cascade, face_data, threshold=0.5):
+def find_matching_face(image_path, face_data, threshold=0.5):
+
     img = cv2.imread(image_path)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    faces = face_recognition.face_locations(img)
 
     matching_faces = []
 
-    for (x, y, w, h) in faces:
-        face_img = img[y:y+h, x:x+w]
+    for (top, right, bottom, left) in faces:
+        face_img = img[top:bottom, left:right]
         face_img = cv2.resize(face_img, (100, 100))
         for img_hash, stored_data in face_data.items():
             stored_faces = stored_data["faces"]  # Access the stored faces

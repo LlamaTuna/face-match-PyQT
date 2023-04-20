@@ -229,11 +229,9 @@ class FaceMatcherApp(QMainWindow):
             QMessageBox.critical(self, "Error", "Please select all required folders and files.")
             return
 
-        face_data = save_faces_from_folder(folder_path=input_folder, output_folder=output_folder, progress_callback=self.update_progress_bar)
+        face_data = save_faces_from_folder(folder_path=input_folder, output_folder=output_folder, face_cascade=None, progress_callback=self.update_progress_bar)
 
-
-
-
+        # Pass the face_data variable to the find_matching_face() function
         matching_faces = find_matching_face(image_to_search, face_data)
 
 
