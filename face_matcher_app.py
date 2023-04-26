@@ -1,5 +1,6 @@
 import sys
 import os
+import platform
 from PyQt5.QtWidgets import QApplication
 from face_matcher_app_class import FaceMatcherApp
 
@@ -8,11 +9,24 @@ if getattr(sys, 'frozen', False):
     app_path = sys._MEIPASS
     pyqt5_path = os.path.join(app_path, 'PyQt5')
     os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = os.path.join(pyqt5_path, 'Qt', 'plugins')
+
+    # Add face_recognition library path
+    library_path = os.path.join(sys._MEIPASS, 'face_recognition')
+    sys.path.insert(0, library_path)
 else:
     # If the application is run from a script
     app_path = os.path.dirname(os.path.abspath(__file__))
-    pyqt5_path = '/home/vance_octane/projects/face-match_Pyqt/face-match-venv/lib/python3.9/site-packages/PyQt5'
-    os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = '/home/vance_octane/projects/face-match_Pyqt/face-match-venv/lib/python3.9/site-packages'
+    
+    if platform.system() == 'Windows':
+        # Use the appropriate path for Windows
+        pyqt5_path = 'C:\\Users\\Saul_T_Lode\\Documents\\Python Scripts\\face-match-PyQT-PyQT-fm-face-recog\\Lib\\site-packages\\PyQt5'
+    else:
+        # Use the path for Linux (or other systems)
+        pyqt5_path = '/home/vance_octane/projects/face-match_Pyqt/face-match-venv/lib/python3.9/site-packages/PyQt5'
+    
+    os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = os.path.join(pyqt5_path, 'Qt', 'plugins')
+
+
 
 if pyqt5_path in sys.path:
     sys.path.remove(pyqt5_path)
