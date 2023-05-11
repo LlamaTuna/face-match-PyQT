@@ -22,14 +22,14 @@ def resource_path(relative_path):
 cnn_face_detector_path = resource_path("tests/mmod_human_face_detector.dat")
 cnn_face_detector = dlib.cnn_face_detection_model_v1(cnn_face_detector_path)
 
-
 def convert_image_format(image_path, output_format='png'):
     img = cv2.imread(image_path)
-    if img is None:
+    if img is None or img.size == 0:
         raise ValueError(f"Unable to read image from {image_path}")
     output_path = os.path.splitext(image_path)[0] + '.' + output_format
     cv2.imwrite(output_path, img)
     return output_path
+
 
 def save_faces_from_folder(folder_path, face_cascade, output_folder, progress_callback=None):
     face_data = {}
@@ -53,7 +53,6 @@ def save_faces_from_folder(folder_path, face_cascade, output_folder, progress_ca
 
             detected_faces = cnn_face_detector(img, 1)
             faces = [(face.rect.top(), face.rect.right(), face.rect.bottom(), face.rect.left()) for face in detected_faces]
-
 
             if len(faces) > 0:
                 img_hash = hashlib.sha256(open(converted_image_path, 'rb').read()).hexdigest()
@@ -96,3 +95,4 @@ def find_matching_face(image_path, face_data, threshold=0.5):
                     matching_faces.append((img_hash, stored_data["file_name"], stored_face, similarity, f"{img_hash}_{i+1}.png"))
 
     return matching_faces
+

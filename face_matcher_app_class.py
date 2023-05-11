@@ -9,6 +9,8 @@ from PyQt5.QtWidgets import QAction
 from PyQt5.QtWidgets import QStyle
 from PyQt5.QtWidgets import QHBoxLayout
 from face_detection import save_faces_from_folder, find_matching_face
+from FaceProcessingThread import FaceProcessingThread
+
 
 
 input_folder = "./faceTests/"
@@ -229,12 +231,15 @@ class FaceMatcherApp(QMainWindow):
             QMessageBox.critical(self, "Error", "Please select all required folders and files.")
             return
 
-        face_data = save_faces_from_folder(folder_path=input_folder, output_folder=output_folder, face_cascade=None, progress_callback=self.update_progress_bar)
+        self.face_processing_thread = FaceProcessingThread(input_folder, output_folder, image_to_search)
+        self.face_processing_thread.processing_done.connect(self.on_processing_finished)
+        self.face_processing_thread.progress_signal.connect(self.update_progress_bar)
+        self.face_processing_thread.start()
+        print("Finished find_match")
 
-        # Pass the face_data variable to the find_matching_face() function
-        matching_faces = find_matching_face(image_to_search, face_data)
 
-
+    def on_processing_finished(self, matching_faces):
+        print("Processing finished")
         if len(matching_faces) > 0:
             self.result_table.setColumnCount(5)
             self.result_table.setHorizontalHeaderLabels(['Match', 'Similarity', 'Original Image File', 'Original Image Hash', 'Resized Image File'])
@@ -254,6 +259,9 @@ class FaceMatcherApp(QMainWindow):
         else:
             self.result_table.setRowCount(0)
             self.result_table.setColumnCount(0)
+
+        print("Finished find_match")
+
 
     def display_selected_matched_face(self):
         current_row = self.result_table.currentRow()
